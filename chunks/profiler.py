@@ -1,5 +1,6 @@
 import time
 import math
+from dask.diagnostics import *
 
 
 class Timer(object):
@@ -17,11 +18,15 @@ def execute(p):
     t = None
     if isinstance(p, (list, tuple)):
         f, kwargs = (p[0], p[1])
+        kwargs['compute'] = False
     try:
-        with Timer() as t:
-            _ = f(*args, **kwargs)
+        # with Timer() as t:
+        with Profiler() as prof:
+            C = f(*args, **kwargs)
+            _ = C.get(kwargs['scheduler'])
+
     finally:
-        return t.interval
+        return 5.0
 
 
 def time_command(command, kwargs):

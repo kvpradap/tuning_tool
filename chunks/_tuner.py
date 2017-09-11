@@ -69,6 +69,9 @@ def handle_two_param(command, args, repeat, do_cartesian):
         sample_sizes = sample_size_setting[function_name]
     prev_best_config, prev_best_runtime = -1, -1
     # size = sample_sizes[-1]
+    ltable = args['ltable']
+    rtable = args['rtable']
+
     for size in sample_sizes:
         curr_best_config, curr_best_runtime = -1, -1
         for config in config_setting:
@@ -76,8 +79,8 @@ def handle_two_param(command, args, repeat, do_cartesian):
             args['nltable_chunks'] = config[0]
             args['nrtable_chunks'] = config[1]
             for i in range(repeat):
-                sampled_table_a, sampled_table_b = sample_tables(args['ltable'],
-                                                                 args['rtable'],
+                sampled_table_a, sampled_table_b = sample_tables(ltable,
+                                                                 rtable,
                                                                  size)
                 logger.info('s_a:{0}, s_b:{1}'.format(len(sampled_table_a), len(sampled_table_b)))
                 if function_name == 'downsample':
@@ -85,8 +88,8 @@ def handle_two_param(command, args, repeat, do_cartesian):
                         args['size'] = len(sampled_table_b)
                 args['ltable'] = sampled_table_a
                 args['rtable'] = sampled_table_b
-
-                runtime += time_command(command, args)
+                runtime = 0
+                # runtime += time_command(command, args)
             runtime = float(runtime) / repeat
             logger.info('size:{0}, config:{1}, avg.runtime:{2}'.format(size, config,
                                                                        runtime))
