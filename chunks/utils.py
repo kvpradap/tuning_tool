@@ -13,7 +13,7 @@ def get_func_args(func):
     return inspect.getargspec(func)[0]
 
 
-def get_class_func_name(command):
+def get_func_class_name(command):
     name = command.__name__
     cls_name = None
     if name == 'block_tables':
@@ -65,3 +65,9 @@ sample_size_setting = {
     'extract_feature_vecs': [0.01, 0.05, 0.1, 0.15, 0.2],
     'predict':[0.01, 0.05, 0.1, 0.15, 0.2]
 }
+
+def get_sample_size_setting(len_input_tables):
+    s = [0.1, 0.2, 0.3, 0.4, 0.5]
+    if len_input_tables > 1:
+        return zip(s, s)
+    return s
