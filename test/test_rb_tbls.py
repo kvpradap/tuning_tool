@@ -60,5 +60,6 @@ param_grid['nrtable_chunks'] = [2, 1]
 
 # (command, input_tables, params_command, params_grid, do_cartesian=False,
 #                 repeat=1)
-result = grid_search(rb.block_tables, input_tables, input_args, param_grid, repeat=1)
+result = grid_search(rb.block_tables, input_tables, input_args, param_grid, repeat=1,
+                     do_cartesian=True)
 print(result)

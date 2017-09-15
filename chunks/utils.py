@@ -1,6 +1,9 @@
 import inspect
 import math
 import logging
+import dmagellan
+from dmagellan.sampler.downsample.downsample import downsample_dk
+from dmagellan.utils.py_utils.utils import get_stopwords_for_downsample
 logger = logging.getLogger(__name__)
 def get_default_args(func):
     """
@@ -28,22 +31,23 @@ def sample_table(table, proportion):
     sampled_table.sort_index(inplace=True)
     return sampled_table
 
-def sample_tables(A, B, proportions):
-    prop_a, prop_b = proportions[0], proportions[1]
-    num_tuples_a = int(math.floor(len(A)*prop_a))
-    num_tuples_b = int(math.floor(len(B)*prop_b))
-    print(len(A), len(B), num_tuples_a, num_tuples_b)
-    if num_tuples_a > len(A):
-        num_tuples_a = len(A)
+def sample_tables(A, B, proportion, lid='id', rid='id', lstopwords=[], rstopwords=[]):
+
+    num_tuples_b = int(math.floor(len(B)*proportion))
+    print(len(A), len(B), len(A), num_tuples_b)
     if num_tuples_b > len(B):
         num_tuples_b = len(B)
-    sampled_table_a = A.sample(num_tuples_a)
-    sampled_table_b = B.sample(num_tuples_b)
+    sampled_table_a, sampled_table_b = downsample_dk(A, B, lid, rid, size=num_tuples_b,
+                                                     y=1,
+                                                     lstopwords=lstopwords,
+                                                     rstopwords=rstopwords, compute=True)
     sampled_table_a.sort_index(inplace=True)
     sampled_table_b.sort_index(inplace=True)
     print(len(sampled_table_a), len(sampled_table_b))
     return sampled_table_a, sampled_table_b
 
+def get_stopwords(table, id):
+    return get_stopwords_for_downsample(table, id)
 
 
 
@@ -67,7 +71,7 @@ sample_size_setting = {
 }
 
 def get_sample_size_setting(len_input_tables):
-    s = [0.1, 0.2, 0.3, 0.4, 0.5]
+    s = [0.1]
     if len_input_tables > 1:
         return zip(s, s)
     return s
