@@ -6,6 +6,8 @@ from copy import deepcopy
 from collections import OrderedDict
 import itertools
 
+import pandas as pd
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -26,11 +28,15 @@ def grid_search(command, input_tables, params_command, params_grid,
     if len(input_tables) == 2:
 
         ltable, rtable = input_tables['ltable'], input_tables['rtable']
+        ltable['id'] = list(range(len(ltable)))
+        rtable['id'] = list(range(len(rtable)))
         lstopwords = get_stopwords(ltable, 'id')
         rstopwords = get_stopwords(rtable, 'id')
         start = time.time()
         s_ltable, s_rtable = sample_tables(ltable, rtable, sample_size,
                                            lstopwords=lstopwords, rstopwords=rstopwords)
+        n1 = len(pd.unique(s_ltable.id))
+        n2 = len(pd.unique(s_rtable.id))
         print('Sampling took: ' + str(time.time()-start))
         args['ltable'] = s_ltable
         args['rtable'] = s_rtable
@@ -46,6 +52,7 @@ def grid_search(command, input_tables, params_command, params_grid,
                                              params_grid.keys(),
                                              config_setting,
                                              repeat=repeat)
+        print('Returning best config as: ' + str(best_config))
     else:
         # do staged tuning
         ltable, rtable = input_tables['ltable'], input_tables['rtable']
@@ -58,6 +65,8 @@ def grid_search(command, input_tables, params_command, params_grid,
                                          params_grid.keys(),
                                          config_setting,
                                              repeat=repeat)
+        print('best config after first stage: ' + str(best_config))
+        print(result[best_config])
         b = best_config[1]
         copy_params_grid = deepcopy(params_grid)
         copy_params_grid[keys[1]] = [b]
@@ -66,8 +75,10 @@ def grid_search(command, input_tables, params_command, params_grid,
                                          params_grid.keys(),
                                          config_setting,
                                              repeat=repeat)
+        print('best_config: ' + str(best_config))
         return best_config, result
     # finally, return the result.
+    print('Returning best config as: ' + str(best_config))
     return best_config, result
 
 def process_args(command, input_tables, params_command, params_grid):
@@ -88,7 +99,6 @@ def process_args(command, input_tables, params_command, params_grid):
     mis_args = set(req_args).difference(params_command)
     mis_args = set(mis_args).difference(input_tables.keys())
     mis_args = set(mis_args).difference(params_grid)
-    print(mis_args)
 
     # missing args must be empty
     if mis_args:
@@ -131,7 +141,7 @@ def do_grid_search(command, args, grid_param_keys, config_setting,
     best_config = None
     # result = OrderedDict()
     for config in config_setting:
-        print(config)
+        print('Trying config:' + str(config))
         # if not isinstance(config, list):
         #     config = [config]
         if not isinstance(config, tuple):
@@ -142,8 +152,7 @@ def do_grid_search(command, args, grid_param_keys, config_setting,
             for i in range(len(grid_param_keys)):
                 args[grid_param_keys[i]] = config[i]
             for i in range(repeat):
-                # tmp = time_command(command, args)
-                tmp = i
+                tmp = time_command(command, args)
                 runtime += tmp
             runtime = float(runtime)/repeat
             config_dict = OrderedDict()
@@ -153,6 +162,7 @@ def do_grid_search(command, args, grid_param_keys, config_setting,
             result[config] = config_dict
         else:
             runtime = result[config].get('runtime')
+        print('Runtime: ' + str(runtime))
         if runtime < best_runtime:
             best_runtime = runtime
             best_config = config

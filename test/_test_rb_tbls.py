@@ -5,7 +5,6 @@ import psutil
 import os
 import sys
 
-sys.path.append('/scratch/pradap/python-work/tuning_tool')
 import dmagellan
 from dask import threaded, multiprocessing
 from dask.diagnostics import *
@@ -43,6 +42,7 @@ block_f = get_features_for_blocking(A1, B1)
 _ = rb.add_rule(['title_title_lev_dist(ltuple, rtuple) > 6'], block_f)
 
 rb.set_table_attrs(['title'], ['title'])
+
 input_tables = OrderedDict()
 input_tables['ltable'] = A
 input_tables['rtable'] = B
@@ -55,8 +55,11 @@ input_args['show_progress'] = False
 input_args['scheduler'] = multiprocessing.get
 
 param_grid = OrderedDict()
+param_grid['nltable_chunks'] = [2, 4]
+param_grid['nrtable_chunks'] = [2, 1]
 
-param_grid = {'nltable_chunks': [1, 2, 4, 16], 'nrtable_chunks': [4, 2, 1, 16]}
-start = time.time()
-result = grid_search(rb.block_tables, input_tables, input_args, param_grid, repeat=1, do_cartesian=True)
-print('Time: ' + str(time.time()-start))
+# (command, input_tables, params_command, params_grid, do_cartesian=False,
+#                 repeat=1)
+result = grid_search(rb.block_tables, input_tables, input_args, param_grid, repeat=1,
+                     do_cartesian=True)
+print(result)

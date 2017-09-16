@@ -139,3 +139,4 @@ ENV/
 .ipynb_checkpoints/
 
 *.csv
+*.html

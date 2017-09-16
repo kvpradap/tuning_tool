@@ -41,8 +41,8 @@ def sample_tables(A, B, proportion, lid='id', rid='id', lstopwords=[], rstopword
                                                      y=1,
                                                      lstopwords=lstopwords,
                                                      rstopwords=rstopwords, compute=True)
-    sampled_table_a.sort_index(inplace=True)
-    sampled_table_b.sort_index(inplace=True)
+    #sampled_table_a.sort_index(inplace=True)
+    #sampled_table_b.sort_index(inplace=True)
     print(len(sampled_table_a), len(sampled_table_b))
     return sampled_table_a, sampled_table_b
 
