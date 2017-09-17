@@ -34,10 +34,12 @@ def grid_search_overlap(input_tables, params_command, params_grid,
         tokenizer = WhiteSpaceTokenizer()
     else:
         tokenizer = QgramTokenizer(qval=args['q_val'])
-    s_ltable = sample_ltable(ltable, ltable['id'], ltable['l_block_attr'], nbins,
+    lid = args['l_key']
+    l_block_attr = args['l_block_attr']
+    s_ltable = sample_ltable(ltable, lid, l_block_attr, nbins,
                              sample_size)
     ob = OverlapBlocker()
-    p = ob.process_and_tokenize_ltable(ltable, ltable['id'], ltable['l_block_attr'],
+    p = ob.process_and_tokenize_ltable(ltable, lid, l_block_attr,
                                        tokenizer, [])
     inv_index = build_inv_index([p])
     if args['word_level'] == True:
@@ -45,8 +47,10 @@ def grid_search_overlap(input_tables, params_command, params_grid,
     else:
         tokenizer = QgramTokenizer(qval=args['q_val'])
 
-    s_rtable = sample_rtable(ltable, ltable['id'], ltable['l_block_attr'], nbins,
-                             tokenizer,
+    rid = args['r_key']
+    r_block_attr = args['r_block_attr']
+
+    s_rtable = sample_rtable(rtable, rid, r_block_attr, tokenizer, nbins,
                              sample_size, inv_index)
     args['ltable'] = s_ltable
     args['rtable'] = s_rtable

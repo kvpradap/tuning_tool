@@ -107,7 +107,7 @@ def sample_rtable(rtable, rid, r_block_attr, tok, nbins, sample_proportion, inv_
     groups = df.groupby('count')
     cnt_ids = {}
     for gid, g in groups:
-        cnt_ids[gid] = list(g[lid].values)
+        cnt_ids[gid] = list(g[rid].values)
 
     cnts = list(df['count'].values)
     cnts += [max(cnts) + 1]

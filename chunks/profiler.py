@@ -18,6 +18,7 @@ def execute(p):
     t = None
     if isinstance(p, (list, tuple)):
         f, kwargs = (p[0], p[1])
+    # f(*args, **kwargs)
     try:
         with Timer() as t, Profiler() as prof, CacheProfiler() as cprof, ResourceProfiler() as rprof:
             _ = f(*args, **kwargs)
