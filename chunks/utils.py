@@ -2,6 +2,7 @@ import inspect
 import math
 import logging
 import dmagellan
+import copy
 from dmagellan.sampler.downsample.downsample import downsample_dk
 from dmagellan.utils.py_utils.utils import get_stopwords_for_downsample
 logger = logging.getLogger(__name__)
@@ -37,13 +38,24 @@ def sample_tables(A, B, proportion, lid='id', rid='id', lstopwords=[], rstopword
     print(len(A), len(B), len(A), num_tuples_b)
     if num_tuples_b > len(B):
         num_tuples_b = len(B)
-    sampled_table_a, sampled_table_b = downsample_dk(A, B, lid, rid, size=num_tuples_b,
+
+    A1 = copy.deepcopy(A)
+    B1 = copy.deepcopy(B)
+    A1.reset_index(inplace=True, drop=True)
+    B1.reset_index(inplace=True, drop=True)
+    A1['_pos'] = list(range(len(A1)))
+    B1['_pos'] = list(range(len(A1)))
+    sampled_table_a, sampled_table_b = downsample_dk(A1, B1, lid, rid, size=num_tuples_b,
                                                      y=1,
                                                      lstopwords=lstopwords,
                                                      rstopwords=rstopwords, compute=True)
     #sampled_table_a.sort_index(inplace=True)
     #sampled_table_b.sort_index(inplace=True)
+    sampled_table_a = sampled_table_a.sort_values('_pos')
+    sampled_table_b = sampled_table_b.sort_values('_pos')
     print(len(sampled_table_a), len(sampled_table_b))
+    sampled_table_a.drop('_pos', axis=1, inplace=True)
+    sampled_table_b.drop('_pos', axis=1, inplace=True)
     return sampled_table_a, sampled_table_b
 
 def get_stopwords(table, id):

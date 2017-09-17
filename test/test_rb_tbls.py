@@ -44,8 +44,8 @@ _ = rb.add_rule(['title_title_lev_dist(ltuple, rtuple) > 6'], block_f)
 
 rb.set_table_attrs(['title'], ['title'])
 input_tables = OrderedDict()
-input_tables['ltable'] = A
-input_tables['rtable'] = B
+input_tables['ltable'] = A1
+input_tables['rtable'] = B1
 
 input_args = OrderedDict()
 input_args['l_key'] = 'id'
