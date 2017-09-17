@@ -10,6 +10,71 @@ import pandas as pd
 
 import logging
 logger = logging.getLogger(__name__)
+from new_tuner import  *
+
+import dmagellan
+from dmagellan.utils.py_utils.utils import build_inv_index, tokenize_strings
+from dmagellan.tokenizer.whitespacetokenizer import WhiteSpaceTokenizer
+from dmagellan.utils.cy_utils.stringcontainer import StringContainer
+from dmagellan.blocker.overlap.overlapblocker import OverlapBlocker
+
+def grid_search_overlap(input_tables, params_command, params_grid,
+                        nbins=10, do_cartesian=False,
+                        repeat=1):
+    ob = OverlapBlocker()
+    command = ob.block_tables
+    args = process_args(command, input_tables, params_command, params_grid)
+    if not check_param_grid(params_grid, do_cartesian):
+        raise ValueError('Check the parameter grid')
+    sample_size = 0.1
+    ltable, rtable = input_tables['ltable'], input_tables['rtable']
+    ltable['id'] = list(range(len(ltable)))
+    rtable['id'] = list(range(len(rtable)))
+    if args['word_level'] == True:
+        tokenizer = WhiteSpaceTokenizer()
+    else:
+        tokenizer = QgramTokenizer(qval=args['q_val'])
+    s_ltable = sample_ltable(ltable, ltable['id'], ltable['l_block_attr'], nbins,
+                             sample_size)
+    ob = OverlapBlocker()
+    p = ob.process_and_tokenize_ltable(ltable, ltable['id'], ltable['l_block_attr'],
+                                       tokenizer, [])
+    inv_index = build_inv_index([p])
+    if args['word_level'] == True:
+        tokenizer = WhiteSpaceTokenizer()
+    else:
+        tokenizer = QgramTokenizer(qval=args['q_val'])
+
+    s_rtable = sample_rtable(ltable, ltable['id'], ltable['l_block_attr'], nbins,
+                             tokenizer,
+                             sample_size, inv_index)
+    args['ltable'] = s_ltable
+    args['rtable'] = s_rtable
+
+
+    # do staged tuning
+    ltable, rtable = input_tables['ltable'], input_tables['rtable']
+    copy_params_grid = deepcopy(params_grid)
+    keys = params_grid.keys()
+    copy_params_grid[keys[0]] = [1]
+
+    config_setting = get_config_setting(copy_params_grid, do_cartesian)
+    best_config, result = do_grid_search(command, args,
+                                         params_grid.keys(),
+                                         config_setting,
+                                         repeat=repeat)
+    print('best config after first stage: ' + str(best_config))
+    print(result[best_config])
+    b = best_config[1]
+    copy_params_grid = deepcopy(params_grid)
+    copy_params_grid[keys[1]] = [b]
+    config_setting = get_config_setting(copy_params_grid, do_cartesian)
+    best_config, result = do_grid_search(command, args,
+                                         params_grid.keys(),
+                                         config_setting,
+                                         repeat=repeat)
+    print('best_config: ' + str(best_config))
+    return best_config, result
 
 
 def grid_search(command, input_tables, params_command, params_grid,
