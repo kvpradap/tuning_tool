@@ -39,8 +39,9 @@ input_args['overlap_size'] = 2
 input_args['rem_stop_words'] = False
 
 param_grid = OrderedDict()
-param_grid = {'nltable_chunks':[1, 2, 4, 8, 16, 32], 'nrtable_chunks':[1, 2, 4, 8, 16,
-                                                                       32]}
+param_grid['nltable_chunks'] = [1, 2, 4, 8, 16, 32]
+param_grid['nrtable_chunks'] = [1, 2, 4, 8, 16, 32]
+
 # def grid_search_overlap(input_tables, params_command, params_grid,
 #                         nbins=10, do_cartesian=False,
 #                         repeat=1):
