@@ -1,132 +1,166 @@
+from collections import OrderedDict
+from copy import deepcopy
+import itertools
+import pandas as pd
+
+from new_tuner import *
 from profiler import *
 from utils import *
-import logging
-logger = logging.getLogger(__name__)
-def grid_search(command, input_args, param_grid, do_cartesian=False, repeat=3):
-    args = preprocess_args(command, input_args, param_grid)
-    if 'num_chunks' in args:
-        logger.info('Handle single param')
-        result = handle_single_param(command, args, repeat)
-    elif 'nltable_chunks' in args and 'nrtable_chunks' in args:
-        logger.info('Handle two param')
-        result = handle_two_param(command, args, repeat, do_cartesian)
+
+import dmagellan
+from dmagellan.utils.py_utils.utils import build_inv_index, tokenize_strings
+from dmagellan.tokenizer.whitespacetokenizer import WhiteSpaceTokenizer
+from dmagellan.utils.cy_utils.stringcontainer import StringContainer
+from dmagellan.blocker.overlap.overlapblocker import OverlapBlocker
+
+
+def grid_search(command, command_params, metadata,
+                do_cartesian=False, sample_size=0.1, repeat=1):
+
+
+    args = process_args(command, command_params)
+    # input_tables, input_keys, search_params
+    input_tables = metadata['input_tables']
+    input_keys = metadata['input_keys']
+    search_params = metadata['search_params']
+
+    # preprocess the search values to get the configuration settings
+    if not check_search_vals(args, search_params, do_cartesian):
+        raise ValueError('Check the search values')
+
+    if len(input_tables) == 2:
+        ltable, rtable = args[input_tables[0]], args[input_tables[1]]
+        ltable[input_keys[0]] = list(range(len(ltable)))
+        rtable[input_keys[1]] = list(range(len(rtable)))
+        lstopwords = get_stopwords(ltable, input_keys[0])
+        rstopwords = get_stopwords(rtable, input_keys[1])
+        s_ltable, s_rtable = sample_tables(ltable, rtable, sample_size,
+                                           lstopwords=lstopwords, rstopwords=rstopwords)
+        args[input_keys[0]] = s_ltable
+        args[input_keys[1]] = s_rtable
     else:
-        raise ValueError('Currently only searching diff. number of chunks is supported')
+        candset = args[input_tables[0]]
+        s_candset = sample_table(candset, sample_size)
+        args[input_tables[0]] = s_candset
 
-    return result
-
-
-
-
-def handle_single_param(command, args, repeat):
-    config_setting = args['num_chunks']
-    function_name, class_name = get_class_func_name(command)
-    if class_name is not None:
-        sample_sizes = sample_size_setting[function_name][class_name]
+    if not do_cartesian or len(input_tables) == 1:
+        config_setting = get_config_setting(args, search_params, do_cartesian)
+        best_config, result = do_grid_search(command, args, search_params,
+                                             config_setting, repeat=repeat)
+        print('Returning best config as : ' + str(best_config))
     else:
-        sample_sizes = sample_size_setting[function_name]
-    prev_best_config, prev_best_runtime = -1, -1
-    size = sample_sizes[-1]
-    for size in sample_sizes:
-        curr_best_config, curr_best_runtime = -1, -1
-        for config in config_setting:
-            runtime = 0
-            for i in range(repeat):
-                sampled_table = sample_table(candset, config)
-                args['candset'] = sampled_table
-                runtime += time_command(command, args)
-            runtime = float(runtime)/repeat
-            logger.info('size:{0}, config:{1}, avg.runtime:{2}'.format(size, config,
-                                                                       runtime))
-            if curr_best_runtime == -1 or runtime < curr_best_runtime:
-                curr_best_runtime = runtime
-                curr_best_config = config
-        if prev_best_runtime == -1 or (curr_best_config != prev_best_config and
-                                           runtime_norm(curr_best_runtime,
-                                                        prev_best_runtime) > 0.05):
-            prev_best_runtime = curr_best_runtime
-            prev_best_config = curr_best_config
-        else:
-            return size
-    return size
+        # do staged tuning
+        # ltable, rtable = args[input_tables[0]], args[input_tables[1]]
+        search_values = get_search_values(args, search_params)
+        copy_search_values = deepcopy(search_values)
+        copy_search_values[0] = [1]
+        args = set_search_values(args, search_params, copy_search_values)
 
-def handle_two_param(command, args, repeat, do_cartesian):
-    ltable_setting = args['nltable_chunks']
-    if not isinstance(ltable_setting, list):
-        ltable_setting = [ltable_setting]
-    rtable_setting = args['nrtable_chunks']
-    if not isinstance(rtable_setting, list):
-        rtable_setting = [rtable_setting]
-    if do_cartesian:
-        config_setting = list(itertools.product(ltable_setting, rtable_setting))
-    else:
-        assert (len(ltable_setting) == len(rtable_setting))
-        config_setting = zip(ltable_setting, rtable_setting)
-    function_name, class_name = get_class_func_name(command)
-    if class_name is not None:
-        sample_sizes = sample_size_setting[function_name][class_name]
-    else:
-        sample_sizes = sample_size_setting[function_name]
-    prev_best_config, prev_best_runtime = -1, -1
-    # size = sample_sizes[-1]
-    ltable = args['ltable']
-    rtable = args['rtable']
+        config_setting = get_config_setting(args, search_params, do_cartesian)
+        best_config, result = do_grid_search(command, args, search_params,
+                                             config_setting, repeat=repeat)
+        print('Best config after stage 1: ' + str(best_config))
 
-    for size in sample_sizes:
-        curr_best_config, curr_best_runtime = -1, -1
-        for config in config_setting:
-            runtime = 0
-            args['nltable_chunks'] = config[0]
-            args['nrtable_chunks'] = config[1]
-            for i in range(repeat):
-                sampled_table_a, sampled_table_b = sample_tables(ltable,
-                                                                 rtable,
-                                                                 size)
-                logger.info('s_a:{0}, s_b:{1}'.format(len(sampled_table_a), len(sampled_table_b)))
-                if function_name == 'downsample':
-                    if args['size'] > len(sampled_table_b):
-                        args['size'] = len(sampled_table_b)
-                args['ltable'] = sampled_table_a
-                args['rtable'] = sampled_table_b
-                runtime = 0
-                # runtime += time_command(command, args)
-            runtime = float(runtime) / repeat
-            logger.info('size:{0}, config:{1}, avg.runtime:{2}'.format(size, config,
-                                                                       runtime))
-            if curr_best_runtime == -1 or runtime < curr_best_runtime:
-                curr_best_runtime = runtime
-                curr_best_config = config
-        if prev_best_runtime == -1 or (curr_best_config != prev_best_config and
-                                               runtime_norm(curr_best_runtime,
-                                                            prev_best_runtime) > 0.05) \
-                or curr_best_runtime < 30:
-            prev_best_runtime = curr_best_runtime
-            prev_best_config = curr_best_config
-        else:
-            return prev_best_config
-    return prev_best_config
+        b = best_config[1]
+        copy_search_values = deepcopy(search_values)
+        copy_search_values[1] = [b]
+        args = set_search_values(args, search_params, copy_search_values)
+
+        config_setting = get_config_setting(args, search_params, do_cartesian)
+        best_config, result = do_grid_search(command, args, search_params,
+                                             config_setting, repeat=repeat)
+        print('Best config after stage 2: ' + str(best_config))
+    return best_config, result
 
 
-def runtime_norm(r1, r2):
-    return float(abs(r1-r2))/min(r1, r2)
-
-def preprocess_args(command, input_args, param_grid):
-
-    default_args = get_default_args(command)
-    function_args = get_func_args(command)
-
-    if 'self' in function_args:
-        function_args.remove('self')
-    required_args = set(function_args).difference(default_args.keys())
-    missing_args = set(required_args).difference(input_args.keys())
-    missing_args = set(missing_args).difference(param_grid.keys())
-
-    if len(missing_args):
-        raise ValueError('The following args are required: ' + str(missing_args))
-    args = default_args
-    for key, value in input_args.iteritems():
-        args[key] = value
-    for key, value in param_grid.iteritems():
-        args[key] = value
-
+def get_search_values(args, search_params):
+    values = []
+    for param in search_params:
+        values.append(args[param])
+    return values
+def set_search_values(args, search_params, values):
+    i = 0
+    for param in search_params:
+        args[param] = values[i]
+        i += 1
     return args
+def process_args(command, command_params):
+    # get the command arguments, by analysing command's prototype
+    fun_args = get_func_args(command)
+
+    # get default values of command arguments, by analysing command's prototype
+    def_args = get_default_args(command)
+
+    # remove 'self'
+    if 'self' in fun_args:
+        fun_args.remove('self')
+
+    # required args
+    req_args = set(fun_args).difference(def_args.keys())
+
+    # get the missing args
+    mis_args = set(req_args).difference(command_params)
+
+    # missing args must be empty
+    if mis_args:
+        raise ValueError('The following args. are missing: {0}'.str(mis_args))
+
+    out_args = def_args
+    for key, val in command_params.iteritems():
+        out_args[key] = val
+
+    return out_args
+
+
+
+def check_search_vals(args, search_vals, do_cartesian):
+    if len(search_vals) > 1 and not do_cartesian:
+        l = args[search_vals[0]]
+        for i in range(1, len(search_vals)):
+            if len(args[search_vals[i]]) != l:
+                return False
+        return True
+    else:
+        return True
+
+def get_config_setting(args, search_values, do_cartesian):
+    values = []
+    for v in search_values:
+        values.append(args[v])
+    if do_cartesian:
+        config_setting = list(itertools.product(*values))
+    else:
+        config_setting = zip(*values)
+    return config_setting
+
+
+def do_grid_search(command, args, search_params, config_setting, result=OrderedDict(),
+                   repeat=1):
+    best_runtime = float('inf')
+    best_config = None
+    for config in config_setting:
+        print('Trying config: ' + str(config))
+        if not instance(config, tuple):
+            config = tuple(config)
+        if config not in result:
+            runtime = 0
+            for i in range(len(search_params)):
+                args[search_params[i]] = config[i]
+            for i in range(repeat):
+                tmp = time_command(command, args)
+                runtime += tmp
+            runtime = float(runtime)/repeat
+            config_dict = OrderedDict()
+            for i in range(len(search_params)):
+                config_dict[search_params[i]] = config[i]
+            config_dict['runtime'] = runtime
+            result[config] = config_dict
+        else:
+            runtime = result[config].get('runtime')
+        print('Runtime: ' + str(runtime))
+        if runtime < best_runtime:
+            best_runtime = runtime
+            best_config = config
+    return best_config, result
+
+    pass
